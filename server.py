@@ -144,12 +144,6 @@ def recovery(leader):
 
 
 #San
-def check():
-    for neighbor_id, neighbor in setting['neighbor']:
-        try:
-            neighbor.request.send("Alive?")
-        except:
-            neighbor_failed.append(neighbor_id)
 
 
 def election(server_id, epoch, counter, server_list):
@@ -188,15 +182,13 @@ def elected(server_id, server_list):
     broadcast(server_list, elected_msg)
 
 ##functions
-def broadcast(server_list, msg):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    for server in server_list:
+def broadcast(msg):
+    for neighbor_id, neighbor in setting['neighbor']:
         try:
-            sock = socket.socket()
-            sock.connect(server[0], server[1])
-            sock.send(msg)
+            neighbor.request.send(msg)
         except:
-            pass
+            neighbor_failed.append(neighbor_id)
+            del setting['neighbor'][neighbor_id]
 
 def init(): ##init when process starts
     ## process election to learn leader
@@ -224,7 +216,7 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
         if ("ELECTION" in self.data):
             #checks if the id in the message is larger than current id
             #If the election requests Id is larger reply with a \n
-            check()
+            broadcast("Alive?")
             if setting['leader'] != 0 and (setting['leader'] in setting['neighbor']) == False:
                 elected_msg = "ELECTED\n{}".format(setting['leader'])
                 broadcast(server_list, elected_msg)
