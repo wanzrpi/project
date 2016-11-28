@@ -11,13 +11,13 @@ DNS_2 = 'ec2-52-87-177-8.compute-1.amazonaws.com'
 DNS_3 = 'ec2-52-37-12-187.us-west-2.compute.amazonaws.com'
 PORT = 4400
 """
-
+#TODO: change epoch and counter to reading from file 
 #global variables
 log_loc = 'log.txt'
 server_addr = {}
 server_id = 0
-#leader_status: 1. 'waiting': waiting election for new leader  2. 'elected': the server knows who is the leader
-setting={'leader':0,'file_sys':{},'neighbor':[],'history':[],'applied':[], 'leader_status':'waiting'}
+#leader_status: leading/following/waiting
+setting = {'init':False, 'leader':0,'file_sys':{},'neighbor':{}, 'neighbor_failed' = [], 'history':[],'applied':[], 'election':''}
 
 #Wan
 def send_msg(m,server): ##function to write msg
@@ -29,6 +29,7 @@ def send_msg(m,server): ##function to write msg
         server.wfile.write(msg[i*1024:(i+1)*1024])
     if int(math.floor(float(size) / 1024))*1024 != size:
         server.wfile.write(msg[int(math.floor(float(size) / 1024))*1024:size])
+
 def read_msg(server): ##function to read msg
     size = int(server.request.recv(1024))
     server.wfile.write(str(size))
@@ -40,6 +41,7 @@ def read_msg(server): ##function to read msg
         buff = server.request.recv(size - int(math.floor(float(size) / 1024)*1024))
         msg += buff
     return msg
+
 def create(file_name):
     if file_name in file_sys:
         return "file {} already exists!".format(file_name)
@@ -142,6 +144,14 @@ def recovery(leader):
 
 
 #San
+def check():
+    for neighbor_id, neighbor in setting['neighbor']:
+        try:
+            neighbor.request.send("Alive?")
+        except:
+            neighbor_failed.append(neighbor_id)
+
+
 def election(server_id, epoch, counter, server_list):
     """
     Bully Election Algrorithm,
@@ -169,11 +179,12 @@ def election(server_id, epoch, counter, server_list):
 
     if (has_highest_id == True):
         elected(server_id, server_list)
-        return server_id
 
 
 def elected(server_id, server_list):
     elected_msg = "ELECTED\n{}".format(server_id)
+    setting['leader'] = server_id
+    setting['election'] = "leading"
     broadcast(server_list, elected_msg)
 
 ##functions
@@ -200,33 +211,49 @@ def init(): ##init when process starts
 ##server handler
 class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
     def handle(self):
+        if setting['init'] == False:
+            init()
+
         # self.request is the TCP socket connected to the client
         self.data = self.request.recv(1024)
         print "{} get request:".format(server_id)
         print self.data
-
+        epoch = len(setting['history'])
+        counter = len(setting['history'][epoch-1])
 
         if ("ELECTION" in self.data):
             #checks if the id in the message is larger than current id
             #If the election requests Id is larger reply with a \n
-            if(int(self.data.split("\n")[1]) > self.epoch):
-                self.request.send("\n")
-            elif(int(self.data.split("\n")[1]) == self.epoch && int(self.data.split("\n")[2]) > self.counter):
-                self.request.send("\n")
+            check()
+            if setting['leader'] != 0 and (setting['leader'] in setting['neighbor']) == False:
+                elected_msg = "ELECTED\n{}".format(setting['leader'])
+                broadcast(server_list, elected_msg)
+
             else:
-                self.request.send("Bigger zxid")
-                #start an election
-                election(self.server_id, self.epoch, self.counter, self.server_list)
+                setting['election'] = "waiting"
+                if(int(self.data.split("\n")[1]) > epoch):
+                    self.request.send("\n")
+                    
+                elif(int(self.data.split("\n")[1]) == epoch && int(self.data.split("\n")[2]) > counter):
+                    self.request.send("\n")
+                    
+                else:
+                    self.request.send("Bigger zxid")
+                    #start an election
+                    election(self.server_id, epoch, counter, self.server_list)
+                
 
         elif ("ELECTED" in self.data):
             leader = self.data.split("\n")[1]
-            self.leader = leader
+            setting['leader'] = leader
+            setting['election'] = "following"
+
+
         elif("CREATE" in self.data):
 
         elif("DELET" in self.data):
 
         elif("READ" in self.data):
-
 
         elif("WRITE" in self.data):
         
@@ -242,27 +269,27 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
 ##main    
 if __name__ == '__main__':
     server_id = sys.argv[1]
-    init()
     server = ThreadedTCPServer((HOST,PORT), ThreadedTCPRequestHandler)
     ip, port = server.server_address
-    server.epoch = 0 
-    server.counter = 0
     server.server_id = server_id
-    #server id is used in the bully election algorithm
-    file_server.server_id= file_port
 
     print "Setting up server on port: {}".format(port)
-    server.server_list=[]
+
     server_num = 5
     #server.host = socket.gethostbyname(DNS_3)
     #server.port = ***********
     #server.leader = ***********
     for index in range(0, server_num):
-        if index != server_id:
-            remote_ip = socket.gethostbyname(DNS_3)
-            server.server_list.append((remote_ip, PORT+index))
+        if index+1 != server_id:
+            try:
+                s = socket.socket()
+                s.connect(ip_add[index], port[index])
+                setting['neighbor'][index+1] = s
+            except:
+                setting['neighbor_failed'].append(index+1)
+    """      
     server_thread = threading.Thread(target = server.serve_forever)
     server_thread.daemon = True
     server_thread.start()
-
+    """
 
