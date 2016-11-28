@@ -205,6 +205,7 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
     def handle(self):
         if setting['init'] == False:
             init()
+            setting['init'] = True
 
         # self.request is the TCP socket connected to the client
         self.data = self.request.recv(1024)
