@@ -283,6 +283,10 @@ if __name__ == '__main__':
     ip, port = server.server_address
     server.server_id = server_id
 
+    server_thread = threading.Thread(target=server.serve_forever)
+    # Exit the server thread when the main thread terminates
+    server_thread.daemon = True
+    server_thread.start()
     
     #server.port = ***********
     #server.leader = ***********
