@@ -290,6 +290,7 @@ if __name__ == '__main__':
     # Exit the server thread when the main thread terminates
     server_thread.daemon = True
     server_thread.start()
+    print "Server running in thread:", server_thread.name
 
     #server.port = ***********
     #server.leader = ***********
