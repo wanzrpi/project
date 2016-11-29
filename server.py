@@ -278,7 +278,10 @@ if __name__ == '__main__':
     ports = range(4400, 4400+server_num)
     
     host = ip_adds[server_id-1]
+    print ip_adds
+    print ports
     port = ports[server_id-1]
+
     server = ThreadedTCPServer((host,port), ThreadedTCPRequestHandler)
     ip, port = server.server_address
     server.server_id = server_id
@@ -287,7 +290,7 @@ if __name__ == '__main__':
     # Exit the server thread when the main thread terminates
     server_thread.daemon = True
     server_thread.start()
-    
+
     #server.port = ***********
     #server.leader = ***********
     for index in range(0, server_num):
