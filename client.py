@@ -19,7 +19,7 @@ addr = (host, port)
 bufsize = 1024 
 client = socket(AF_INET,SOCK_STREAM) 
 client.connect(addr)
-client.send("Client create a.txt")
+client.sendall("Client create a.txt\n")
 while True:
     data = client.recv(bufsize)
     if not data: 
