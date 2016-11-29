@@ -12,15 +12,14 @@ DNS_2 = 'ec2-52-87-177-8.compute-1.amazonaws.com'
 # Oregon instance
 DNS_3 = 'ec2-52-37-12-187.us-west-2.compute.amazonaws.com'
 
-host = socket.gethostbyname(DNS_3)
-PORT = 4400
+host, port = "localhost", 8881
 
 #addr = ipadd[int(raw_input('which node to connect?\n'))]
-addr = (host, PORT)
+addr = (host, port)
 bufsize = 1024 
 client = socket(AF_INET,SOCK_STREAM) 
 client.connect(addr)
-client.send("client")
+client.send("Client create a.txt")
 while True:
     data = client.recv(bufsize)
     if not data: 

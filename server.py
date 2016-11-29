@@ -14,11 +14,12 @@ PORT = 4400
 
 #TODO: change epoch and counter to reading from file 
 #global variables
-log_loc = 'log.txt'
+
 server_addr = {}
 server_id = 0
+
 #leader_status: leading/following/waiting
-setting = {'init':False, 'leader':0,'file_sys':{},'neighbor':{}, 'neighbor_failed' : [], 'history':[],'applied':[], 'election':''}
+setting = {'init':False, 'server_id' : 0, 'server_num' : 1, 'ip_adds' :[], 'ports': [], 'leader':0,'file_sys':{},'neighbor':{}, 'neighbor_failed' : [], 'history':[],'applied':[], 'election':''}
 
 #Wan
 def send_msg(m,server): ##function to write msg
@@ -118,7 +119,7 @@ def write_history():
 
 def update(leader, history_max):
     msg = json.dumps(history_max)
-    send_msg('history_match', leader)
+    send_msg('history_match', setting['neighbor'][leader])
     rcv = read_msg(leader)
     if rcv == 'history_match ACK':
         send_msg(msg, leader)
@@ -180,7 +181,8 @@ def elected(server_id, server_list):
     elected_msg = "ELECTED {}".format(server_id)
     setting['leader'] = server_id
     setting['election'] = "leading"
-    broadcast(server_list, elected_msg)
+    print"Leading Now"
+    broadcast(elected_msg)
 
 ##functions
 def broadcast(msg):
@@ -194,56 +196,73 @@ def broadcast(msg):
 def init(): ##init when process starts
     ## process election to learn leader
     history=get_history(log_loc)
-    if recovery(leader):
+     
+    for index in range(0, setting['server_num']):
+        if index+1 != setting['server_id']:
+            try:
+                s = socket.socket()
+                s.connect(setting['ip_adds'][index], setting['ports'][index])
+                setting['neighbor'][index+1] = s
+            except:
+                setting['neighbor_failed'].append(index+1)
+    """
+    if recovery(setting["leader"]):
         ## start servering
         return
     else:
         ##newelection
         return
-
+    """
 ##server handler
 class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
     def handle(self):
-        if setting['init'] == False:
-            init()
-            setting['init'] = True
+        
 
         # self.request is the TCP socket connected to the client
         epoch = len(setting['history'])
-        counter = len(setting['history'][epoch-1])
+        if epoch == 0:
+            counter = 0
+        else:
+            counter = len(setting['history'][epoch-1])
         
         data = self.request.recv(1024)
         if data == "":
             sys.exit()
 
+        if setting['init'] == False:
+            init()
+            setting['init'] = True
         
-        if ("Client" in self.data):
-            message = self.data.split(' ', 1)[1]
+        if ("Client" in data):
+            if setting['leader'] == 0:
+                election(setting['server_id'], epoch, counter, setting['neighbor'])
+            message = data.split(' ', 1)[1]
             broadcast(message)
 
-        elif ("ELECTION" in self.data):
+        elif ("ELECTION" in data):
             #checks if the id in the message is larger than current id
             #If the election requests Id is larger reply with a \n
             broadcast("Alive?")
             if setting['leader'] != 0 and (setting['leader'] in setting['neighbor']) == False:
                 elected_msg = "ELECTED {}".format(setting['leader'])
-                broadcast(server_list, elected_msg)
+                broadcast(elected_msg)
 
             else:
                 setting['election'] = "waiting"
-                if(int(self.data.split()[1]) > epoch):
+                if(int(data.split()[1]) > epoch):
                     self.request.send("\n")
                     
-                elif (int(self.data.split()[1]) == epoch) and (int(self.data.split()[2]) > counter):
+                elif (int(data.split()[1]) == epoch) and (int(data.split()[2]) >= counter):
                     self.request.send("\n")
+
                     
                 else:
                     self.request.send("Bigger zxid")
                     #start an election
-                    election(self.server_id, epoch, counter, self.server_list)
+                    election(setting['server_id'], epoch, counter, setting['neighbor'])
                 
 
-        elif ("ELECTED" in self.data):
+        elif ("ELECTED" in data):
             leader = self.data.split()[1]
             setting['leader'] = leader
             setting['election'] = "following"
@@ -267,44 +286,41 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
         """
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     pass
+
 ##main    
 if __name__ == '__main__':
     server_id = int(sys.argv[1])
-    
+    setting['server_id'] = server_id
     #print "Setting up server on port: {}".format(port)
     host = socket.gethostbyname(DNS_3)
-    server_num = 5
-    ip_adds = [host]*server_num
-    ports = range(4400, 4400+server_num)
+    server_num = 3
+    setting['server_num'] = server_num 
+    setting['ip_adds'] = ["localhost"]*server_num
+    setting['ports'] = range(8880, 8880+server_num)
     
-    host = ip_adds[server_id-1]
-    print ip_adds
-    print ports
-    port = ports[server_id-1]
-
+    #host = ip_adds[server_id-1]
+    #port = ports[server_id-1]
+    host, port = "localhost", setting['ports'][server_id-1]
     server = ThreadedTCPServer((host,port), ThreadedTCPRequestHandler)
     ip, port = server.server_address
     server.server_id = server_id
 
+    log_loc = 'log_%d.txt'%server_id
+    open(log_loc,'a').close()
+
+    server.server_alive = True
+    server.serve_forever()
+    print "Setting up Server on port: {}".format(port)
+    # Start a thread with the server -- that thread will then start one
+    # more thread for each request
     server_thread = threading.Thread(target=server.serve_forever)
-    # Exit the server thread when the main thread terminates
-    server_thread.daemon = True
-    server_thread.start()
-    print "Server running in thread:", server_thread.name
+    
 
     #server.port = ***********
     #server.leader = ***********
-    for index in range(0, server_num):
-        if index+1 != server_id:
-            try:
-                s = socket.socket()
-                s.connect(ip_add[index], port[index])
-                setting['neighbor'][index+1] = s
-            except:
-                setting['neighbor_failed'].append(index+1)
-    """      
-    server_thread = threading.Thread(target = server.serve_forever)
+    
+    
     server_thread.daemon = True
     server_thread.start()
-    """
+    server.shutdown()
 
