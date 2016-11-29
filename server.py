@@ -17,7 +17,7 @@ log_loc = 'log.txt'
 server_addr = {}
 server_id = 0
 #leader_status: leading/following/waiting
-setting = {'init':False, 'leader':0,'file_sys':{},'neighbor':{}, 'neighbor_failed' = [], 'history':[],'applied':[], 'election':''}
+setting = {'init':False, 'leader':0,'file_sys':{},'neighbor':{}, 'neighbor_failed' : [], 'history':[],'applied':[], 'election':''}
 
 #Wan
 def send_msg(m,server): ##function to write msg
