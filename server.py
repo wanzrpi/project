@@ -157,7 +157,7 @@ def election(server_id, epoch, counter, server_list):
         else if no server replies then server becomes the primary copy
           then sends out an elected message
     """
-    election_msg="ELECTION\n{}\n{}".format(epoch, counter)
+    election_msg="ELECTION {} {}".format(epoch, counter)
     has_highest_id=True
 
     for server in server_list:
@@ -176,7 +176,7 @@ def election(server_id, epoch, counter, server_list):
 
 
 def elected(server_id, server_list):
-    elected_msg = "ELECTED\n{}".format(server_id)
+    elected_msg = "ELECTED {}".format(server_id)
     setting['leader'] = server_id
     setting['election'] = "leading"
     broadcast(server_list, elected_msg)
@@ -208,26 +208,32 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
             setting['init'] = True
 
         # self.request is the TCP socket connected to the client
-        self.data = self.request.recv(1024)
-        print "{} get request:".format(server_id)
-        print self.data
         epoch = len(setting['history'])
         counter = len(setting['history'][epoch-1])
+        
+        data = self.request.recv(1024)
+        if data = "":
+            break
 
-        if ("ELECTION" in self.data):
+        
+        if ("Client" in self.data):
+            message = self.data.split(' ', 1)[1]
+            broadcast(message)
+
+        elif ("ELECTION" in self.data):
             #checks if the id in the message is larger than current id
             #If the election requests Id is larger reply with a \n
             broadcast("Alive?")
             if setting['leader'] != 0 and (setting['leader'] in setting['neighbor']) == False:
-                elected_msg = "ELECTED\n{}".format(setting['leader'])
+                elected_msg = "ELECTED {}".format(setting['leader'])
                 broadcast(server_list, elected_msg)
 
             else:
                 setting['election'] = "waiting"
-                if(int(self.data.split("\n")[1]) > epoch):
+                if(int(self.data.split()[1]) > epoch):
                     self.request.send("\n")
                     
-                elif(int(self.data.split("\n")[1]) == epoch && int(self.data.split("\n")[2]) > counter):
+                elif(int(self.data.split()[1]) == epoch && int(self.data.split()[2]) > counter):
                     self.request.send("\n")
                     
                 else:
@@ -237,7 +243,7 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
                 
 
         elif ("ELECTED" in self.data):
-            leader = self.data.split("\n")[1]
+            leader = self.data.split()[1]
             setting['leader'] = leader
             setting['election'] = "following"
 
