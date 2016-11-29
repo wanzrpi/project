@@ -233,7 +233,7 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
                 if(int(self.data.split()[1]) > epoch):
                     self.request.send("\n")
                     
-                elif((int(self.data.split()[1]) == epoch) && (int(self.data.split()[2]) > counter):
+                elif((int(self.data.split()[1]) == epoch) and (int(self.data.split()[2]) > counter):
                     self.request.send("\n")
                     
                 else:
