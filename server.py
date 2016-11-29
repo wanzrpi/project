@@ -212,7 +212,7 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
         counter = len(setting['history'][epoch-1])
         
         data = self.request.recv(1024)
-        if data = "":
+        if data == "":
             break
 
         
