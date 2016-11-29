@@ -2,7 +2,7 @@ from SocketServer import TCPServer, BaseRequestHandler
 import socket
 import json
 import sys
-"""
+
 # CA instance
 DNS_1 = 'ec2-54-67-101-22.us-west-1.compute.amazonaws.com'
 # Virginia instance
@@ -10,7 +10,7 @@ DNS_2 = 'ec2-52-87-177-8.compute-1.amazonaws.com'
 # Oregon instance
 DNS_3 = 'ec2-52-37-12-187.us-west-2.compute.amazonaws.com'
 PORT = 4400
-"""
+
 #TODO: change epoch and counter to reading from file 
 #global variables
 log_loc = 'log.txt'
@@ -263,6 +263,7 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
         elif("EXIT" in self.data):
 
         else:
+            return
 
 
 ##main    
@@ -272,10 +273,13 @@ if __name__ == '__main__':
     ip, port = server.server_address
     server.server_id = server_id
 
-    print "Setting up server on port: {}".format(port)
-
+    #print "Setting up server on port: {}".format(port)
+    host = socket.gethostbyname(DNS_3)
     server_num = 5
-    #server.host = socket.gethostbyname(DNS_3)
+    ip_add = [host]*server_num
+    port = range(4400, 4400+server_num)
+    
+    
     #server.port = ***********
     #server.leader = ***********
     for index in range(0, server_num):
