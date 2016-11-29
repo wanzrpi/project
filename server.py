@@ -268,7 +268,7 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
 
 ##main    
 if __name__ == '__main__':
-    server_id = sys.argv[1]
+    server_id = int(sys.argv[1])
     
     #print "Setting up server on port: {}".format(port)
     host = socket.gethostbyname(DNS_3)
