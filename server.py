@@ -246,7 +246,6 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
             leader = self.data.split()[1]
             setting['leader'] = leader
             setting['election'] = "following"
-
         """
         elif("CREATE" in self.data):
 
