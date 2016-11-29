@@ -260,10 +260,10 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
         
 
         elif("EXIT" in self.data):
-        """
+     
         else:
             return
-
+        """
 
 ##main    
 if __name__ == '__main__':
