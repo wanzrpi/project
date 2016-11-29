@@ -213,7 +213,7 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
         
         data = self.request.recv(1024)
         if data == "":
-            break
+            sys.exit()
 
         
         if ("Client" in self.data):
