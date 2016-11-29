@@ -269,16 +269,19 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
 ##main    
 if __name__ == '__main__':
     server_id = sys.argv[1]
-    server = ThreadedTCPServer((HOST,PORT), ThreadedTCPRequestHandler)
-    ip, port = server.server_address
-    server.server_id = server_id
-
+    
     #print "Setting up server on port: {}".format(port)
     host = socket.gethostbyname(DNS_3)
     server_num = 5
-    ip_add = [host]*server_num
-    port = range(4400, 4400+server_num)
+    ip_adds = [host]*server_num
+    ports = range(4400, 4400+server_num)
     
+    host = ip_adds[server_id-1]
+    port = ports[server_id-1]
+    server = ThreadedTCPServer((host,port), ThreadedTCPRequestHandler)
+    ip, port = server.server_address
+    server.server_id = server_id
+
     
     #server.port = ***********
     #server.leader = ***********
