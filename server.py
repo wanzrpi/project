@@ -247,7 +247,7 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
             setting['leader'] = leader
             setting['election'] = "following"
 
-
+        """
         elif("CREATE" in self.data):
 
         elif("DELET" in self.data):
@@ -261,7 +261,7 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
         
 
         elif("EXIT" in self.data):
-
+        """
         else:
             return
 
