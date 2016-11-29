@@ -112,7 +112,7 @@ def get_history_max():
 def write_history():
     f.open(log_loc, 'a')
     for i in range (0,len(setting['history'])):
-        for j in range (0,len(setting['history'][i]])):
+        for j in range (0,len(setting['history'][i])):
             f.write('{} {} {}\n'.format(i, j, setting['history'][i][j]))
 
 def update(leader, history_max):
