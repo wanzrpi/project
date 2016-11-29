@@ -265,7 +265,8 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
         else:
             return
         """
-
+class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+    pass
 ##main    
 if __name__ == '__main__':
     server_id = int(sys.argv[1])
