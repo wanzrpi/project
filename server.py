@@ -1,4 +1,6 @@
-import socket
+from socket import *
+import errno
+from socket import error as socket_error
 import threading
 import SocketServer
 import json
@@ -11,15 +13,18 @@ DNS_2 = 'ec2-52-87-177-8.compute-1.amazonaws.com'
 # Oregon instance
 DNS_3 = 'ec2-52-37-12-187.us-west-2.compute.amazonaws.com'
 PORT = 4400
-DEBUG = 1
 #TODO: change epoch and counter to reading from file 
 #global variables
 
 server_addr = {}
 server_id = 0
-
+DEBUG = 1
 #leader_status: leading/following/waiting
-setting = {'init':False, 'server_id' : 0, 'server_num' : 1, 'ip_adds' :[], 'ports': [], 'leader':0,'file_sys':{},'neighbor':{}, 'neighbor_failed' : [], 'history':[],'applied':[], 'election':''}
+setting = {'init':0, 'server_id' : 0, 'server_num' : 1, 'ip_adds' :[], 'ports': [], 'leader':0,'file_sys':{},'neighbor':{}, 'neighbor_failed' : [], 'history':[],'applied':[], 'election':''}
+server_num = 3
+setting['server_num'] = server_num
+setting['ip_adds'] = ["localhost"]*server_num
+setting['ports'] = range(8880, 8880+server_num)
 
 #Wan
 def send_msg(m,server): ##function to write msg
@@ -159,38 +164,37 @@ def election(server_id, epoch, counter, server_list):
         else if no server replies then server becomes the primary copy
           then sends out an elected message
     """
-    election_msg="ELECTION {} {}\n".format(epoch, counter)
+    election_msg="ELECTION {} {}".format(epoch, counter)
     has_highest_id=True
 
-    for server in server_list:
+    for neighbor_id, neighbor in server_list.items():
         try:
-            sock = socket.socket()
-            sock.connect(server[0],server[1])
-            sock.send(election_msg)
-            response = sock.recv(1024)
+            neighbor.send(election_msg)
+            response = neighbor.recv(1024)
             if(not response == "wait"):
                 has_highest_id = False
         except:
-            pass
+            print ("Error sending election")
 
     if (has_highest_id == True):
         elected(server_id, server_list)
 
 
 def elected(server_id, server_list):
-    elected_msg = "ELECTED {}\n".format(server_id)
+    elected_msg = "ELECTED {}".format(server_id)
     setting['leader'] = server_id
     setting['election'] = "leading"
-    
+    if DEBUG:
+        print "LEADING NOW"
     broadcast(elected_msg)
 
 ##functions
 def broadcast(msg):
-    for neighbor_id, neighbor in setting['neighbor']:
+    for neighbor_id, neighbor in setting['neighbor'].items():
         try:
             neighbor.send(msg)
         except:
-            neighbor_failed.append(neighbor_id)
+            setting['neighbor_failed'].append(neighbor_id)
             del setting['neighbor'][neighbor_id]
 
 def init(): ##init when process starts
@@ -206,13 +210,19 @@ def init(): ##init when process starts
     for index in range(0, setting['server_num']):
         if index+1 != setting['server_id']:
             try:
-                s = socket.socket()
-                s.connect(setting['ip_adds'][index], setting['ports'][index])
+
+                s = socket() 
+                s.connect((setting['ip_adds'][index], setting['ports'][index]))
                 setting['neighbor'][index+1] = s
+                s.send("server %d connected"%setting["server_id"])
+  
             except:
                 setting['neighbor_failed'].append(index+1)
 
-    
+    print setting['neighbor']
+    print setting['neighbor_failed']
+
+
     """
     if recovery(setting["leader"]):
         ## start servering
@@ -233,11 +243,11 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             counter = len(setting['history'][epoch-1])
 
 
-        if setting['init'] == False:
+        if setting['init'] == 0:
             init()
-            setting['init'] = True
+            setting['init'] = 1
 
-        data = self.rfile.readline().strip()
+        data = self.request.recv(1024)
         if data == "":
             sys.exit()
         print data
@@ -245,7 +255,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         if ("Client" in data):
             if setting['leader'] == 0:
                 election(setting['server_id'], epoch, counter, setting['neighbor'])
-            message = data.split(' ', 1)[1]+"\n"
+            message = data.split(' ', 1)[1]
             if DEBUG:
                 print "Get message from Client!"
             broadcast(message)
@@ -253,22 +263,22 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         elif ("ELECTION" in data):
             #checks if the id in the message is larger than current id
             #If the election requests Id is larger reply with a \n
-            broadcast("Alive?\n")
-            if setting['leader'] != 0 and (setting['leader'] in setting['neighbor']) == False:
-                elected_msg = "ELECTED {}\n".format(setting['leader'])
-                broadcast(elected_msg)
+            broadcast("Alive?")
+            if setting['leader'] != 0 and (setting['leader'] in setting['neighbor_failed']) == False:
+                elected_msg = "ELECTED {}".format(setting['leader'])
+                self.wfile.write(elected_msg)
 
             else:
                 setting['election'] = "waiting"
                 if(int(data.split()[1]) > epoch):
-                    self.wfile.write("wait\n")
+                    self.wfile.write("wait")
                     
                 elif (int(data.split()[1]) == epoch) and (int(data.split()[2]) >= counter):
-                    self.wfile.write("wait\n")
+                    self.wfile.write("wait")
 
                     
                 else:
-                    self.wfile.write("Bigger zxid\n")
+                    self.wfile.write("Bigger zxid")
                     #start an election
                     election(setting['server_id'], epoch, counter, setting['neighbor'])
                 
@@ -285,6 +295,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
 
             setting['leader'] = leader
             setting['election'] = "following"
+
 
         """
         elif("CREATE" in self.data):
@@ -335,11 +346,8 @@ if __name__ == '__main__':
 
     setting['server_id'] = server_id
     #print "Setting up server on port: {}".format(port)
-    host = socket.gethostbyname(DNS_3)
-    server_num = 3
-    setting['server_num'] = server_num 
-    setting['ip_adds'] = ["localhost"]*server_num
-    setting['ports'] = range(8880, 8880+server_num)
+    host = gethostbyname(DNS_3)
+    
     
     #host = ip_adds[server_id-1]
     #port = ports[server_id-1]
