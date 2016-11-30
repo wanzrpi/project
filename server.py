@@ -20,11 +20,12 @@ server_addr = {}
 server_id = 0
 DEBUG = 1
 #leader_status: leading/following/waiting
-setting = {'init':0, 'server_id' : 0, 'server_num' : 1, 'ip_adds' :[], 'ports': [], 'leader':0,'file_sys':{},'neighbor':{}, 'neighbor_failed' : [], 'history':[],'applied':[], 'election':''}
+setting = {'TODO':[],'init':0, 'server_id' : 0, 'server_num' : 1, 'ip_adds' :[], 'ports': [], 'leader':0,'file_sys':{},'neighbor':{}, 'neighbor_failed' : [], 'history':[],'applied':[], 'election':''}
 server_num = 3
 setting['server_num'] = server_num
 setting['ip_adds'] = ["localhost"]*server_num
 setting['ports'] = range(8880, 8880+server_num)
+
 
 #Wan
 def send_msg(m,server): ##function to write msg
@@ -79,10 +80,12 @@ def append(file_name, msg):
         return "file {} does not exist!".format(file_name)
 
 def process_command(command):
+    """
     if command[0]=='a':
         command = command.split(' ', 2)
     else:
         command = command.split(' ', 1)
+    """
     if command[0] == 'create':
         return create(command[1])
     elif command[0] == 'delete':
@@ -152,6 +155,27 @@ def recovery(leader):
 
 #San
 
+def SendReq(epoch, counter, message):
+    req_msg = "Request {} {}".format(epoch, counter)
+    commit = True
+    commit_count = 0
+    for neighbor_id, neighbor in server_list.items():
+        try:
+            neighbor.send(req_msg)
+            response = neighbor.recv(1024)
+            print response
+            if(response == "commit"):
+                commit_count += 1
+        except:
+            print ("Error sending request")
+
+    if (commit_count > server_num/2):
+        return commit
+    else: 
+        commit = False
+        return commit
+
+        
 
 def election(server_id, epoch, counter, server_list):
     """
@@ -171,6 +195,7 @@ def election(server_id, epoch, counter, server_list):
         try:
             neighbor.send(election_msg)
             response = neighbor.recv(1024)
+            print response
             if(not response == "wait"):
                 has_highest_id = False
         except:
@@ -196,9 +221,11 @@ def broadcast(msg):
         except:
             setting['neighbor_failed'].append(neighbor_id)
             del setting['neighbor'][neighbor_id]
+            print "delete"
 
 def init(): ##init when process starts
     ## process election to learn leader
+    setting['init'] = 1
     history=get_history(log_loc)
     epoch = len(setting['history'])
 
@@ -219,8 +246,8 @@ def init(): ##init when process starts
             except:
                 setting['neighbor_failed'].append(index+1)
 
-    print setting['neighbor']
-    print setting['neighbor_failed']
+    #print setting['neighbor']
+    #print setting['neighbor_failed']
 
 
     """
@@ -234,87 +261,109 @@ def init(): ##init when process starts
 ##server handler
 class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
     def handle(self):
-        
-        # self.request is the TCP socket connected to the client
-        epoch = len(setting['history'])
-        if epoch == 0:
-            counter = 0
-        else:
-            counter = len(setting['history'][epoch-1])
-
-
-        if setting['init'] == 0:
-            init()
-            setting['init'] = 1
-
-        data = self.request.recv(1024)
-        if data == "":
-            sys.exit()
-        print data
-
-        if ("Client" in data):
-            if setting['leader'] == 0:
-                election(setting['server_id'], epoch, counter, setting['neighbor'])
-            message = data.split(' ', 1)[1]
-            if DEBUG:
-                print "Get message from Client!"
-            broadcast(message)
-
-        elif ("ELECTION" in data):
-            #checks if the id in the message is larger than current id
-            #If the election requests Id is larger reply with a \n
-            broadcast("Alive?")
-            if setting['leader'] != 0 and (setting['leader'] in setting['neighbor_failed']) == False:
-                elected_msg = "ELECTED {}".format(setting['leader'])
-                self.wfile.write(elected_msg)
-
+        while 1:
+            # self.request is the TCP socket connected to the client
+            epoch = len(setting['history'])
+            if epoch == 0:
+                counter = 0
             else:
-                setting['election'] = "waiting"
-                if(int(data.split()[1]) > epoch):
-                    self.wfile.write("wait")
-                    
-                elif (int(data.split()[1]) == epoch) and (int(data.split()[2]) >= counter):
-                    self.wfile.write("wait")
+                counter = len(setting['history'][epoch-1])
 
-                    
-                else:
-                    self.wfile.write("Bigger zxid")
-                    #start an election
-                    election(setting['server_id'], epoch, counter, setting['neighbor'])
+
+            if setting['init'] == 0:
+                init()
                 
 
-        elif ("ELECTED" in data):
-            leader = self.data.split()[1]
-            if DEBUG:
-                print"My leader is %d"%leader
+            data = self.request.recv(1024)
+            if data == "":
+                sys.exit()
+            print data
+            print "\n"
+
+            if ("Client" in data):
+                if setting['leader'] == 0:
+                    election(setting['server_id'], epoch, counter, setting['neighbor'])
+                message = data.split(' ', 1)[1]
+                if DEBUG:
+                    print "Get message from Client!"
+                leader = setting['leader']
                 if leader == setting['server_id']:
-                    print"My election status is leading"
+                    Commit = SendReq(epoch, counter, message)
+                    if Commit == True:
+                        TODO.append(command)
+                        for i in range(len(TODO)):
+                            process_command(TODO[0])
+                            TODO.pop(0)
+                        commit_msg = "Commit {} {} ".format(epoch, counter)+message
+
+                        broadcast(commit_msg)
+
+                    else:
+                        print "Not committed"
                 else:
-                    print"My election status is following"
+                    fwd = "Forward "+message
+                    setting['neighbor'][leader].send(fwd)
+
+            elif ("Forward" in data):
+                Commit = SendReq(epoch, counter, message)
+                if Commit == True:
+                    process_command(message)
+                    commit_msg = "Commit {} {} ".format(epoch, counter)+message
+                    broadcast(commit_msg)
+                else:
+                    print "Not committed"
 
 
-            setting['leader'] = leader
-            setting['election'] = "following"
+            elif ("ELECTION" in data):
+                #checks if the id in the message is larger than current id
+
+                broadcast("Alive?")
+                if setting['leader'] != 0 and (setting['leader'] in setting['neighbor_failed']) == False:
+                    elected_msg = "ELECTED {}".format(setting['leader'])
+                    self.wfile.write(elected_msg)
+
+                else:
+                    setting['election'] = "waiting"
+                    if(int(data.split()[1]) > epoch):
+                        self.wfile.write("wait")
+                        
+                    elif (int(data.split()[1]) == epoch) and (int(data.split()[2]) >= counter):
+                        self.wfile.write("wait")
+
+                        
+                    else:
+                        self.wfile.write("Bigger zxid")
+                        #start an election
+                        election(setting['server_id'], epoch, counter, setting['neighbor'])
+                    
+
+            elif ("ELECTED" in data):
+                leader = int(data.split()[1])
+                if DEBUG:
+                    print"My leader is %d"%leader
+                    if leader == setting['server_id']:
+                        print"My election status is leading"
+                    else:
+                        print"My election status is following"
 
 
-        """
-        elif("CREATE" in self.data):
+                setting['leader'] = leader
+                setting['election'] = "following"
 
-        elif("DELET" in self.data):
+            elif ("Request" in data):
+                self.wfile.write("commit")
 
-        elif("READ" in self.data):
+            elif  ("Commit" in data):
+                message = data.split(' ', 1)[1]
+                message = message.split()
+                zxid = (int(message[0]), int(message[1]))
+                command = message[2:]
+                TODO.append(command)
+                        for i in range(len(TODO)):
+                            process_command(TODO[0])
+                            TODO.pop(0)
 
-        elif("WRITE" in self.data):
         
-
-        elif("APPEND" in self.data):
-        
-
-        elif("EXIT" in self.data):
-     
-        else:
-            return
-        """
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     pass
 
