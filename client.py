@@ -6,6 +6,7 @@ server_addr = {1:("127.0.0.1",8010),
                4:("127.0.0.1",8040),
                5:("127.0.0.1",8050)}
 
+
 addr = server_addr[int(raw_input('which node to connect?\n'))]
 bufsize = 1024 
 client = socket(AF_INET,SOCK_STREAM) 
