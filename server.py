@@ -51,30 +51,30 @@ def read_msg(server): ##function to read msg
     return msg
 
 def create(file_name):
-    if file_name in file_sys:
+    if file_name in setting['file_sys']:
         return "file {} already exists!".format(file_name)
     else:
-        file_sys[file_name]=""
+        setting['file_sys'][file_name]=""
         return "file {} created successfully!"
 
 
 def delete(file_name):
-    if file_name in file_sys:
-        del file_sys[file_name]
+    if file_name in setting['file_sys']:
+        del setting['file_sys'][file_name]
         return "file {} deleted successfully!".format(file_name)
     else:
         return "file {} does not exist!".format(file_name)
 
 
 def read(file_name):
-    if file_name in file_sys:
-        return file_sys[file_name]
+    if file_name in setting['file_sys']:
+        return setting['file_sys'][file_name]
     else:
         return "file {} does not exist!".format(file_name)
 
 def append(file_name, msg):
-    if file_name in file_sys:
-        file_sys[file_name] += msg
+    if file_name in setting['file_sys']:
+        setting['file_sys'][file_name] += msg
         return "message appended successfully!"
     else:
         return "file {} does not exist!".format(file_name)
@@ -159,7 +159,7 @@ def SendReq(epoch, counter, message):
     req_msg = "Request {} {}".format(epoch, counter)
     commit = True
     commit_count = 0
-    for neighbor_id, neighbor in server_list.items():
+    for neighbor_id, neighbor in setting['neighbor'].items():
         try:
             neighbor.send(req_msg)
             response = neighbor.recv(1024)
@@ -290,10 +290,10 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                 if leader == setting['server_id']:
                     Commit = SendReq(epoch, counter, message)
                     if Commit == True:
-                        TODO.append(command)
-                        for i in range(len(TODO)):
-                            process_command(TODO[0])
-                            TODO.pop(0)
+                        setting['TODO'].append([message.split()])
+                        for i in range(len(setting['TODO'])):
+                            process_command(setting['TODO'][0])
+                            setting['TODO'].pop(0)
                         commit_msg = "Commit {} {} ".format(epoch, counter)+message
 
                         broadcast(commit_msg)
@@ -358,10 +358,10 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                 message = message.split()
                 zxid = (int(message[0]), int(message[1]))
                 command = message[2:]
-                TODO.append(command)
-                        for i in range(len(TODO)):
-                            process_command(TODO[0])
-                            TODO.pop(0)
+                setting['TODO'].append(command)
+                for i in range(len(setting['TODO'])):
+                    process_command(setting['TODO'][0])
+                    setting['TODO'].pop(0)
 
         
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
